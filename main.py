@@ -948,7 +948,10 @@ def main():
 
     sender = require_env("GMAIL_ADDRESS")
     app_password = require_env("GMAIL_APP_PASSWORD")
-    recipient = os.environ.get("DIGEST_TO", sender)
+    # `or`, not a get() default: GitHub Actions passes unset optional secrets as
+    # an EMPTY STRING rather than omitting them, so a default would be skipped
+    # and the recipient would end up blank.
+    recipient = os.environ.get("DIGEST_TO") or sender
     send_email(html, sender, app_password, recipient, images)
     print(f"Sent digest to {recipient} ({len(rows)} tickers, {len(images)} charts).")
 
