@@ -7,7 +7,9 @@ No app to install. No account to create. No subscription. It runs itself in the
 cloud for free and emails you at market open (9:30am ET) and after the close
 (5:00pm ET).
 
-> Informational only — this is **not** investment advice.
+> ⚠️ Informational only — this is **not** investment advice. Please read the
+> **[DISCLAIMER](DISCLAIMER.md)** before using it, especially the section on
+> handling your credentials safely.
 
 ---
 
