@@ -1,0 +1,9 @@
+{
+  "stocks": ["AAPL", "MSFT", "AMZN", "SPY"],
+  "crypto": ["BTC", "ETH", "DOGE"],
+  "crypto_ids": {},
+  "labels": {},
+  "news_per_ticker": 3,
+  "news_lookback_days": 2,
+  "macro_news": 6
+}

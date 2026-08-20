@@ -1,0 +1,31 @@
+name: Holdings and Market Digest
+
+on:
+  schedule:
+    # Cron is always UTC and does NOT follow daylight saving, so we fire at BOTH
+    # the EDT and EST times for each target. main.py then sends only when the
+    # actual US/Eastern time is inside a send window, so exactly two emails go
+    # out per weekday year-round (9:30am and 5:00pm Eastern).
+    - cron: "30 13 * * 1-5"   # 9:30am EDT  (summer morning)
+    - cron: "30 14 * * 1-5"   # 9:30am EST  (winter morning)
+    - cron: "0 21 * * 1-5"    # 5:00pm EDT  (summer evening)
+    - cron: "0 22 * * 1-5"    # 5:00pm EST  (winter evening)
+  workflow_dispatch: {}        # manual runs from the Actions tab always send (no window check)
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Send digest
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          DIGEST_TO: ${{ secrets.DIGEST_TO }}   # optional; blank falls back to sender
+        run: python main.py
