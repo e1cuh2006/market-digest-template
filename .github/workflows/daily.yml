@@ -2,16 +2,21 @@ name: Holdings and Market Digest
 
 on:
   schedule:
-    # GitHub Actions runs scheduled jobs on a best-effort basis and is often
-    # LATE — sometimes by hours — especially on the hour and half hour. So:
-    #   * exactly ONE cron per edition (a delayed run still sends, never skips)
-    #   * odd minutes, off the peak, to reduce queue delay
-    # Cron is UTC and does not follow daylight saving, so Eastern arrival
-    # shifts by an hour between EDT and EST. That is the accepted tradeoff for
-    # never missing a send.
-    - cron: "7 13 * * 1-5"    # ~9:07am EDT / 8:07am EST — morning edition
-    - cron: "7 21 * * 1-5"    # ~5:07pm EDT / 4:07pm EST — evening edition
-  workflow_dispatch: {}       # manual run from the Actions tab
+    # GitHub Actions cron is BEST-EFFORT and frequently late (observed 13 min to
+    # 8 hours). A single cron therefore cannot hit a target time. Instead we make
+    # many attempts after each target; main.py --schedule-check gates them and an
+    # already-sent marker (Actions cache) ensures exactly ONE email per edition.
+    #
+    # Targets are US/Eastern: 9:30am (market open) and 4:00pm (market close).
+    # These bands cover both EDT and EST, every day of the week (crypto doesn't
+    # take weekends off). Odd minutes dodge the peak-of-hour queue congestion.
+    - cron: "7,37 13-17 * * *"    # morning band  — 9:07am-1:37pm EDT / 8:07am-12:37pm EST
+    - cron: "7,37 20-23 * * *"    # evening band  — 4:07pm-7:37pm EDT / 3:07pm-6:37pm EST
+  workflow_dispatch: {}           # manual run always sends immediately
+
+concurrency:
+  group: digest-send              # never let two attempts race each other
+  cancel-in-progress: false
 
 jobs:
   digest:
@@ -23,10 +28,45 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Is an edition due right now (i.e. are we at/after a target time)?
+      # GITHUB_EVENT_NAME is provided by the runner automatically; it must NOT
+      # be set in env: — Actions rejects any workflow that assigns a GITHUB_* var.
+      - name: Decide whether an edition is due
+        id: decide
+        run: python main.py --schedule-check >> "$GITHUB_OUTPUT"
+
+      # Has this edition already gone out today? The marker is keyed date+edition.
+      # Only scheduled runs consult/record the marker, so a manual run can
+      # always re-send for testing.
+      - name: Check already-sent marker
+        id: marker
+        if: steps.decide.outputs.send == 'yes' && github.event_name == 'schedule'
+        uses: actions/cache/restore@v4
+        with:
+          path: .sent-marker
+          key: sent-${{ steps.decide.outputs.date }}-${{ steps.decide.outputs.edition }}
+          lookup-only: true
+
       - name: Send digest
+        if: steps.decide.outputs.send == 'yes' && steps.marker.outputs.cache-hit != 'true'
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           DIGEST_TO: ${{ secrets.DIGEST_TO }}   # optional; blank falls back to sender
-        run: python main.py
+        run: |
+          python main.py
+          date -u > .sent-marker
+
+      # Record the marker so later attempts today skip this edition.
+      - name: Record already-sent marker
+        if: steps.decide.outputs.send == 'yes' && steps.marker.outputs.cache-hit != 'true' && github.event_name == 'schedule'
+        uses: actions/cache/save@v4
+        with:
+          path: .sent-marker
+          key: sent-${{ steps.decide.outputs.date }}-${{ steps.decide.outputs.edition }}
+
+      - name: Nothing to do
+        if: steps.decide.outputs.send != 'yes' || steps.marker.outputs.cache-hit == 'true'
+        run: |
+          echo "No send. due=${{ steps.decide.outputs.send }} already_sent=${{ steps.marker.outputs.cache-hit }}"

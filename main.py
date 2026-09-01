@@ -89,17 +89,46 @@ def require_env(name):
     return val
 
 
-# Which edition this run is, from the actual Eastern time it executes.
-# GitHub Actions fires scheduled jobs LATE (often by hours), so the workflow now
-# uses exactly one cron per edition and always sends — never a time-window gate,
-# which silently skipped every delayed run.
-MORNING_CUTOFF_HOUR = 14  # ET hour before which a run is the "morning" edition
+# Target send times, US/Eastern: market open and market close.
+# GitHub Actions fires scheduled jobs LATE and unpredictably (observed 13 min to
+# 8 hours), so the workflow schedules MANY attempts after each target. The first
+# attempt at or after a target sends; later ones are deduplicated by the caller
+# via an already-sent marker. Runs before the morning target send nothing.
+ET = ZoneInfo("America/New_York")
+MARKET_OPEN = (9, 30)    # 9:30am ET — morning edition
+MARKET_CLOSE = (16, 0)   # 4:00pm ET — evening edition
+
+
+def schedule_state(now=None):
+    """Which edition is due right now, if any.
+    Returns (send: bool, edition: str, et_date: str)."""
+    now = now or datetime.now(ET)
+    mins = now.hour * 60 + now.minute
+    open_m = MARKET_OPEN[0] * 60 + MARKET_OPEN[1]
+    close_m = MARKET_CLOSE[0] * 60 + MARKET_CLOSE[1]
+    date = now.strftime("%Y-%m-%d")
+    if mins >= close_m:
+        return True, "evening", date
+    if mins >= open_m:
+        return True, "morning", date
+    return False, "morning", date   # before the open — nothing due yet
 
 
 def current_edition():
-    return ("morning"
-            if datetime.now(ZoneInfo("America/New_York")).hour < MORNING_CUTOFF_HOUR
-            else "evening")
+    return schedule_state()[1]
+
+
+def print_schedule_check():
+    """Emit GitHub Actions outputs so the workflow can gate and dedupe.
+    A manual (workflow_dispatch) run always sends."""
+    send, edition, date = schedule_state()
+    if os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch":
+        send = True
+    now = datetime.now(ET)
+    print(f"send={'yes' if send else 'no'}")
+    print(f"edition={edition}")
+    print(f"date={date}")
+    sys.stderr.write(f"ET now {now:%Y-%m-%d %H:%M} -> send={send} edition={edition}\n")
 
 
 # --------------------------------------------------------------------------- #
@@ -940,4 +969,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if "--schedule-check" in sys.argv:
+        print_schedule_check()
+    else:
+        main()

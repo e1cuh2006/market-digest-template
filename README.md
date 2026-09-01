@@ -1,11 +1,11 @@
 # Holdings & Market Digest
 
 **A free, self-hosted email digest that tracks any stocks and crypto you care
-about — twice a weekday, in one email, with charts and news.**
+about — twice a day, in one email, with charts and news.**
 
 No app to install. No account to create. No subscription. It runs itself in the
-cloud for free and emails you at market open (9:30am ET) and after the close
-(5:00pm ET).
+cloud for free and emails you at market open (9:30am ET) and market close
+(4:00pm ET) — every day, weekends included.
 
 > ⚠️ Informational only — this is **not** investment advice. Please read the
 > **[DISCLAIMER](DISCLAIMER.md)** before using it, especially the section on
@@ -120,16 +120,26 @@ set -a && source .env && set +a
 DRY_RUN=1 python3 main.py # writes preview.html
 ```
 
-## Changing the schedule
+## Schedule
 
-Times are set by the two `cron` lines in
+Two emails **every day**, weekends included (crypto doesn't take weekends off):
+
+| Edition | Target |
+|---|---|
+| Morning | 9:30am ET — market open |
+| Evening | 4:00pm ET — market close |
+
+**How the timing works.** GitHub Actions cron is best-effort and is often late —
+delays of minutes to several hours are normal — so a single cron can't land on a
+target time. Instead the workflow schedules many attempts after each target,
+`main.py --schedule-check` only lets a run proceed at or after a target, and an
+Actions cache marker (keyed date + edition) guarantees exactly one email per
+edition. Whichever attempt GitHub actually runs first wins; the rest exit in
+seconds. Bands cover both EDT and EST, so daylight saving needs no adjustment.
+
+To change the targets, edit `MARKET_OPEN` / `MARKET_CLOSE` in
+[`main.py`](main.py) and the matching `cron` bands in
 [`.github/workflows/daily.yml`](.github/workflows/daily.yml) (UTC).
-
-**Timing is approximate.** GitHub Actions runs scheduled jobs on a best-effort
-basis and is often late — sometimes by hours. The workflow therefore uses one
-cron per edition and always sends when it fires, rather than gating on a target
-time (which would silently skip every delayed run). Eastern arrival shifts by an
-hour between EDT and EST.
 
 ## How it works
 
