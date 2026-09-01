@@ -122,9 +122,14 @@ DRY_RUN=1 python3 main.py # writes preview.html
 
 ## Changing the schedule
 
-Times are set in [`.github/workflows/daily.yml`](.github/workflows/daily.yml)
-(cron, in UTC) and `SEND_WINDOWS` in [`main.py`](main.py). It's preconfigured
-for 9:30am and 5:00pm US Eastern and handles daylight saving automatically.
+Times are set by the two `cron` lines in
+[`.github/workflows/daily.yml`](.github/workflows/daily.yml) (UTC).
+
+**Timing is approximate.** GitHub Actions runs scheduled jobs on a best-effort
+basis and is often late — sometimes by hours. The workflow therefore uses one
+cron per edition and always sends when it fires, rather than gating on a target
+time (which would silently skip every delayed run). Eastern arrival shifts by an
+hour between EDT and EST.
 
 ## How it works
 

@@ -2,15 +2,16 @@ name: Holdings and Market Digest
 
 on:
   schedule:
-    # Cron is always UTC and does NOT follow daylight saving, so we fire at BOTH
-    # the EDT and EST times for each target. main.py then sends only when the
-    # actual US/Eastern time is inside a send window, so exactly two emails go
-    # out per weekday year-round (9:30am and 5:00pm Eastern).
-    - cron: "30 13 * * 1-5"   # 9:30am EDT  (summer morning)
-    - cron: "30 14 * * 1-5"   # 9:30am EST  (winter morning)
-    - cron: "0 21 * * 1-5"    # 5:00pm EDT  (summer evening)
-    - cron: "0 22 * * 1-5"    # 5:00pm EST  (winter evening)
-  workflow_dispatch: {}        # manual runs from the Actions tab always send (no window check)
+    # GitHub Actions runs scheduled jobs on a best-effort basis and is often
+    # LATE — sometimes by hours — especially on the hour and half hour. So:
+    #   * exactly ONE cron per edition (a delayed run still sends, never skips)
+    #   * odd minutes, off the peak, to reduce queue delay
+    # Cron is UTC and does not follow daylight saving, so Eastern arrival
+    # shifts by an hour between EDT and EST. That is the accepted tradeoff for
+    # never missing a send.
+    - cron: "7 13 * * 1-5"    # ~9:07am EDT / 8:07am EST — morning edition
+    - cron: "7 21 * * 1-5"    # ~5:07pm EDT / 4:07pm EST — evening edition
+  workflow_dispatch: {}       # manual run from the Actions tab
 
 jobs:
   digest:

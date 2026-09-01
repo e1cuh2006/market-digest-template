@@ -89,28 +89,17 @@ def require_env(name):
     return val
 
 
-# Send windows in minutes-past-midnight, US/Eastern. The workflow fires at both
-# EDT and EST clock times; only the run that lands inside a window actually
-# sends, so exactly two emails go out per weekday regardless of daylight saving.
-SEND_WINDOWS = [
-    (9 * 60 + 30, 10 * 60 + 15),   # morning: 9:30–10:15 ET (market open)
-    (17 * 60, 18 * 60),            # evening: 5:00–6:00 PM ET
-]
+# Which edition this run is, from the actual Eastern time it executes.
+# GitHub Actions fires scheduled jobs LATE (often by hours), so the workflow now
+# uses exactly one cron per edition and always sends — never a time-window gate,
+# which silently skipped every delayed run.
+MORNING_CUTOFF_HOUR = 14  # ET hour before which a run is the "morning" edition
 
 
-def within_send_window():
-    """True if the current US/Eastern time is inside a configured send window."""
-    now = datetime.now(ZoneInfo("America/New_York"))
-    mins = now.hour * 60 + now.minute
-    return any(start <= mins < end for start, end in SEND_WINDOWS)
-
-
-def scheduled_run_should_skip():
-    """On GitHub *scheduled* runs, skip unless we're inside a send window.
-    Manual (workflow_dispatch) and local runs always proceed."""
-    if os.environ.get("GITHUB_EVENT_NAME") != "schedule":
-        return False
-    return not within_send_window()
+def current_edition():
+    return ("morning"
+            if datetime.now(ZoneInfo("America/New_York")).hour < MORNING_CUTOFF_HOUR
+            else "evening")
 
 
 # --------------------------------------------------------------------------- #
@@ -828,7 +817,7 @@ def render_macro(news, recaps, edition):
 def render_html(rows, macro_news, recaps):
     now_et = datetime.now(ZoneInfo("America/New_York"))
     today = now_et.strftime("%A, %B %-d")
-    edition_word = "morning" if now_et.hour < 12 else "evening"
+    edition_word = current_edition()
     edition = f"{edition_word.capitalize()} edition"
 
     mover = top_mover(rows)
@@ -871,7 +860,7 @@ def render_html(rows, macro_news, recaps):
 # --------------------------------------------------------------------------- #
 def send_email(html, sender, app_password, recipient, images):
     now_et = datetime.now(ZoneInfo("America/New_York"))
-    edition = "Morning" if now_et.hour < 12 else "Evening"
+    edition = current_edition().capitalize()
     subject = f"Holdings and Market Digest — {edition} Edition · {now_et:%B %-d, %Y}"
 
     # multipart/related lets the sparkline PNGs travel inside the email and be
@@ -903,17 +892,11 @@ def send_email(html, sender, app_password, recipient, images):
 # Main
 # --------------------------------------------------------------------------- #
 def main():
-    if scheduled_run_should_skip():
-        now = datetime.now(ZoneInfo("America/New_York"))
-        print(f"Outside send window ({now:%H:%M} ET); no email sent.")
-        return
-
     cfg = load_config()
     api_key = require_env("FINNHUB_API_KEY")
     rows = build_rows(cfg, api_key)
     macro_news = get_macro_news(api_key, cfg.get("macro_news", 6))
-    edition = ("morning" if datetime.now(ZoneInfo("America/New_York")).hour < 12
-               else "evening")
+    edition = current_edition()
     recaps = build_recaps(rows, macro_news, edition)
     dry_run = os.environ.get("DRY_RUN") == "1"
 
