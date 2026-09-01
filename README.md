@@ -105,8 +105,7 @@ Secrets are encrypted, hidden from the code, and masked in logs. Optionally add
 Go to the **Actions** tab → **Holdings and Market Digest** → **Run workflow**.
 Check your inbox in a minute or two.
 
-That's it. From then on it arrives automatically every weekday morning and
-evening.
+That's it. From then on it arrives automatically twice a day, every day.
 
 ---
 
