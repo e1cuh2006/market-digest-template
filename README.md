@@ -105,6 +105,11 @@ Secrets are encrypted, hidden from the code, and masked in logs. Optionally add
 Go to the **Actions** tab → **Holdings and Market Digest** → **Run workflow**.
 Check your inbox in a minute or two.
 
+> The workflow is **disabled in this template repo** (it has no credentials, so
+> scheduled runs would just fail). Your own copy has it enabled — if Actions
+> asks you to confirm workflows on a new fork, click **I understand my workflows,
+> go ahead and enable them**.
+
 That's it. From then on it arrives automatically twice a day, every day.
 
 ---
